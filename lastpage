@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>반려동물 추모 공간</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Nanum+Myeongjo:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f0f0;
+        }
+        .font-nanum {
+            font-family: 'Nanum Myeongjo', serif;
+        }
+        
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7); opacity: 0;
+            transition: opacity 0.5s ease; pointer-events: none; z-index: 40;
+        }
+        #overlay.active { opacity: 1; pointer-events: auto; }
+
+        .grid-item {
+            perspective: 1000px; transition: all 0.3s ease;
+            cursor: pointer; position: relative;
+        }
+        
+        .glass-door {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(2px);
+            border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 0.375rem;
+            transform-origin: left;
+            transition: transform 0.6s cubic-bezier(0.65, 0, 0.35, 1);
+            z-index: 10;
+        }
+        .grid-item:hover .glass-door { background: rgba(255, 255, 255, 0.6); }
+
+        .item-content-preview {
+            width: 100%; height: 100%; padding: 1rem; border-radius: 0.375rem;
+            background-color: #e9e9e9; box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+            transition: opacity 0.3s;
+        }
+
+        .grid-item.expanded {
+            position: fixed; top: 50%; left: 50%;
+            width: 90vw; max-width: 500px; height: 80vh; max-height: 650px;
+            transform: translate(-50%, -50%) scale(1);
+            z-index: 50; cursor: default;
+        }
+        .grid-item.expanded .glass-door { transform: rotateY(-120deg) translateX(-10px); }
+        .grid-item.expanded .close-btn { opacity: 1; }
+        .grid-item.expanded .expanded-content {
+             opacity: 1;
+             transform: translateY(0);
+             transition-delay: 0.2s;
+        }
+        .grid-item.expanded .item-content-preview {
+            opacity: 0;
+        }
+
+        .urn-preview { width: 40%; height: 50%; background-color: #d1d5db; border-top-left-radius: 50%; border-top-right-radius: 50%; border: 2px solid #9ca3af; }
+        .photo-frame-preview { width: 25%; height: 35%; background-color: #ffffff; border: 5px solid #d2b48c; }
+        .flower-indicator { position: absolute; top: 8px; right: 8px; font-size: 1.5rem; text-shadow: 0 0 5px white; pointer-events: none; z-index: 15; }
+        .empty-slot { opacity: 0.7; display: flex; align-items: center; justify-content: center; }
+        .empty-slot:hover { opacity: 1; }
+        
+        .expanded-content {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column;
+            opacity: 0; transform: translateY(20px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+            background-color: #e9e9e9;
+            border-radius: 0.375rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .top-details {
+            text-align: center;
+            padding: 1.5rem 1rem 0.5rem; 
+            flex-shrink: 0;
+        }
+
+        .scene-container {
+            flex-grow: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .scene-background {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+            padding: 1rem;
+            padding-bottom: 5rem;
+        }
+        .urn { 
+            width: 45%; 
+            height: 80%;
+            background-color: #e0e0e0; 
+            border-top-left-radius: 50%; 
+            border-top-right-radius: 50%; 
+            border: 2px solid #cccccc; 
+            position: relative; 
+        }
+        .urn::before { content: ''; position: absolute; bottom: 100%; left: 25%; width: 50%; height: 10%; background-color: #d0d0d0; border-radius: 5px 5px 0 0; }
+        .photo-frame { 
+            width: 40%; 
+            height: 80%;
+            background-color: #ffffff; 
+            border: 8px solid #d2b48c; 
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2); 
+            position: relative; 
+        }
+        
+        .photo-display { position: absolute; width: 100%; height: 100%; }
+        .photo-display img { width: 100%; height: 100%; object-fit: cover; }
+        .photo-upload-label {
+            width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; background-color: rgba(0,0,0,0.1); font-size: 0.875rem;
+        }
+        .photo-upload-label:hover { background-color: rgba(0,0,0,0.2); }
+
+        .goods-selector {
+            position: absolute;
+            bottom: 3%;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+        .goods-item {
+            width: 44px;
+            height: 44px;
+            background-color: rgba(107, 114, 128, 0.2);
+            border: 1px solid rgba(107, 114, 128, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            position: relative;
+        }
+        .goods-item:hover {
+            background-color: rgba(107, 114, 128, 0.4);
+        }
+        .goods-item svg {
+            width: 24px;
+            height: 24px;
+            stroke: #4b5563;
+            fill: none;
+            stroke-width: 1.5;
+        }
+
+        .close-btn {
+            position: absolute; top: 1rem; right: 1rem; width: 2rem; height: 2rem;
+            font-size: 1.5rem; color: #333; background: rgba(255,255,255,0.5);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; z-index: 20; opacity: 0; transition: opacity 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-200 flex items-center justify-center min-h-screen p-4">
+    
+    <div id="overlay"></div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 p-2 rounded-lg bg-black bg-opacity-10 shadow-inner w-full max-w-6xl">
+        <!-- JavaScript로 동적으로 생성 -->
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const gridContainer = document.querySelector('.grid');
+            const overlay = document.getElementById('overlay');
+            let currentlyExpanded = null;
+            let isAnimating = false; // 애니메이션 상태를 관리하는 플래그
+
+            const totalItems = 15;
+            const itemData = [
+                { name: '초코', message: '우리 집 귀염둥이, 별이 되어 반짝여줘.', date: '2010.05.01 ~ 2024.03.15', isOccupied: true, photoSrc: 'https://placehold.co/300x400/d2b48c/ffffff?text=CHOCO' },
+                { name: '나비', message: '따뜻한 햇살 같던 너를 기억해.', date: '2018.07.20 ~ 2023.12.10', isOccupied: true, photoSrc: null },
+                { name: '해피', message: '너와 함께한 모든 날이 행복했어.', date: '2012.01.11 ~ 2024.01.02', isOccupied: true, photoSrc: 'https://placehold.co/300x400/a9a9a9/ffffff?text=HAPPY' },
+                { isOccupied: false },
+                { name: '코코', message: '세상에서 가장 용감했던 작은 천사', date: '2020.02.02 ~ 2024.04.01', isOccupied: true, photoSrc: null },
+                { isOccupied: false },
+                { isOccupied: false },
+            ];
+
+            // --- 함수 정의 ---
+            function expandItem(item) {
+                if (!item || isAnimating) return;
+                isAnimating = true;
+                
+                const rect = item.getBoundingClientRect();
+                item.style.transform = `translate(${rect.left - (window.innerWidth / 2) + (rect.width / 2)}px, ${rect.top - (window.innerHeight / 2) + (rect.height / 2)}px) scale(${rect.width / 500}, ${rect.height / 600})`;
+                item.style.transition = 'none';
+                
+                overlay.classList.add('active');
+                item.classList.add('expanded');
+                currentlyExpanded = item;
+
+                requestAnimationFrame(() => {
+                    item.style.transition = 'transform 0.6s cubic-bezier(0.65, 0, 0.35, 1)';
+                    item.style.transform = 'translate(-50%, -50%) scale(1)';
+                });
+
+                setTimeout(() => {
+                    isAnimating = false;
+                }, 600);
+            }
+
+            function collapseItem(item, callback) {
+                if (!item || isAnimating) return;
+                isAnimating = true;
+
+                item.classList.remove('expanded');
+                overlay.classList.remove('active');
+                
+                setTimeout(() => {
+                    item.style.transform = '';
+                    item.style.transition = '';
+                    if (currentlyExpanded === item) {
+                        currentlyExpanded = null;
+                    }
+                    isAnimating = false;
+                    if (callback) {
+                        callback();
+                    }
+                }, 600);
+            }
+
+            // --- 아이템 생성 및 이벤트 리스너 설정 ---
+            for (let i = 0; i < totalItems; i++) {
+                const item = document.createElement('div');
+                item.className = 'grid-item aspect-square';
+                const data = itemData[i] || { isOccupied: false };
+                
+                // ... (내부 HTML 생성 로직은 이전과 동일)
+                const glassDoor = document.createElement('div');
+                glassDoor.className = 'glass-door';
+                const itemContentPreview = document.createElement('div');
+                itemContentPreview.className = 'item-content-preview';
+                const closeBtn = document.createElement('div');
+                closeBtn.className = 'close-btn';
+                closeBtn.innerHTML = '&times;';
+                closeBtn.onclick = (e) => { e.stopPropagation(); collapseItem(item); };
+                const expandedContent = document.createElement('div');
+                expandedContent.className = 'expanded-content';
+                if (data.isOccupied) {
+                    item.appendChild(Object.assign(document.createElement('span'), { className: 'flower-indicator', textContent: '🌸' }));
+                    itemContentPreview.innerHTML = `<div class="w-full h-full flex items-end justify-around opacity-70"><div class="urn-preview"></div><div class="photo-frame-preview"></div></div>`;
+                    expandedContent.innerHTML = `
+                        <div class="top-details">
+                            <h2 class="text-3xl font-bold mb-2 font-nanum">${data.name}</h2>
+                            <p class="text-gray-600 mb-2 text-sm">"${data.message}"</p>
+                            <p class="text-xs text-gray-500">${data.date}</p>
+                        </div>
+                        <div class="scene-container">
+                            <div class="scene-background">
+                                <div class="urn"></div>
+                                <div class="photo-frame">
+                                    <div class="photo-display">
+                                        <img class="photo-img ${data.photoSrc ? '' : 'hidden'}" src="${data.photoSrc || ''}" alt="${data.name}의 사진">
+                                        <label class="photo-upload-label ${data.photoSrc ? 'hidden' : 'flex'}">
+                                            <input type="file" accept="image/*" class="hidden photo-input">
+                                            <span>🖼️</span>
+                                            <span>대표 사진 설정하기</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="goods-selector">
+                                <div class="goods-item" title="털실 굿즈"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-7.5 16.5M12 22a10 10 0 0 0 7.5-16.5M2 12h20M12 2a14 14 0 0 0-4 2.5M12 22a14 14 0 0 1 4-2.5M12 2a14 14 0 0 1 4 2.5M12 22a14 14 0 0 0-4-2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+                                <div class="goods-item" title="반지 굿즈"><svg viewBox="0 0 24 24"><path d="M12 21a9 9 0 0 0-9-9 9 9 0 0 0 9-9 9 9 0 0 0 9 9 9 9 0 0 0-9 9zM10.5 8.5l3 3" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+                                <div class="goods-item" title="목걸이 굿즈"><svg viewBox="0 0 24 24"><path d="M12 22a7 7 0 0 0 7-7V9a2 2 0 0 0-2-2h-1a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2h1M12 22a7 7 0 0 1-7-7V9a2 2 0 0 1 2-2h1a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-1" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="12" cy="16" r="3"></circle></svg></div>
+                            </div>
+                        </div>`;
+                } else {
+                    itemContentPreview.classList.add('empty-slot');
+                    itemContentPreview.innerHTML = `<div class="text-gray-600 font-nanum text-lg">빈 자리</div>`;
+                    expandedContent.innerHTML = `<div class="flex flex-col items-center justify-center h-full"><h2 class="text-3xl font-bold mb-4 font-nanum">빈 자리</h2><p class="text-gray-600 text-center">이 자리는 현재 비어있습니다.<br>새로운 안식을 기다립니다.</p></div>`;
+                }
+                item.append(closeBtn, glassDoor, itemContentPreview, expandedContent);
+                gridContainer.appendChild(item);
+
+                // 클릭 로직 수정
+                item.addEventListener('click', () => {
+                    if (isAnimating) return;
+
+                    if (currentlyExpanded && currentlyExpanded !== item) {
+                        // 다른 아이템이 열려있으면, 그것을 닫고 콜백으로 새 아이템을 염
+                        collapseItem(currentlyExpanded, () => {
+                            expandItem(item);
+                        });
+                    } else if (!currentlyExpanded) {
+                        // 아무것도 열려있지 않으면, 현재 아이템을 염
+                        expandItem(item);
+                    }
+                });
+
+                // ... (사진 업로드, 굿즈 클릭 이벤트 리스너는 이전과 동일)
+                const photoInput = item.querySelector('.photo-input');
+                if (photoInput) {
+                    photoInput.addEventListener('change', (e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                                const img = item.querySelector('.photo-img');
+                                const label = item.querySelector('.photo-upload-label');
+                                img.src = event.target.result;
+                                img.classList.remove('hidden');
+                                label.classList.add('hidden');
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    });
+                }
+                const goodsItems = item.querySelectorAll('.goods-item');
+                goodsItems.forEach(goods => {
+                    goods.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const goodsType = goods.getAttribute('title');
+                        console.log(`${goodsType} 추가 기능 실행`);
+                    });
+                });
+            }
+
+            overlay.addEventListener('click', () => {
+                if (currentlyExpanded) {
+                    collapseItem(currentlyExpanded);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
